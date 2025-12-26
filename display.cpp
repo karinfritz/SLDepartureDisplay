@@ -62,6 +62,7 @@ void Display::init() {
   _blue = _display->color565(0, 0, 255);
   _gray = _display->color565(200, 200, 200);
   _yeish = _display->color565(200, 200, 170);
+  _darkyellow = _display->color565(204, 204, 0);
 }
 
 void Display::start() {
@@ -89,9 +90,7 @@ void Display::run(int cursor) {
 }
 
 void Display::showNext(String depStr, String depStr2, int cursor) {
-  //_display->clearScreen();
   _display->fillScreen(_black);
-  //_display->setFont(&TomThumb);
   _display->setTextSize(1);
   _display->setTextWrap(false);
   _display->setTextColor(_white);
@@ -103,59 +102,60 @@ void Display::showNext(String depStr, String depStr2, int cursor) {
 
 int xPos[] = {1, 9, 45};
 
-void Display::drawDeps(Departure deps[], int count) {
+void Display::prepare(){
   _display->fillScreen(_black);
   _display->setFont(&TomThumb);
   _display->setTextSize(1);
   _display->setTextWrap(false);
   _display->setTextColor(_yeish);
+}
 
-  for (int i = 0; i < count; i++) {
+void Display::drawTimeAndWeather(String timeStr, String tempStr, int i){
+  prepare();
+  _display->setTextColor(_darkyellow);
+  _display->setCursor(1, 8);
+  _display->println(tempStr);
+  const uint8_t* icon = getWeatherIcon5(i);
+  drawIcon5(22, 3, icon, _darkyellow, 5);
+  _display->setCursor(45, 8);
+  _display->println(timeStr);
+}
+
+void Display::drawIcon5(int x, int y, const uint8_t* icon, uint16_t color, int numCols) {
+  for (int row = 0; row < 5; row++) {
+    uint16_t bits = pgm_read_word(&icon[row]);
+
+    for (int col = 0; col < numCols; col++) {
+      if (bits & (1 << (numCols - 1 - col))) {
+        _display->drawPixel(x + col, y + row, color);
+      }
+    }
+  }
+}
+
+void Display::drawDeps(Departure deps[], int count) {
+  _display->setTextColor(_yeish);
+
+  for (int i = 1; i < count + 1; i++) {
     int yPos = i * 7 + 8;
     _display->setCursor(xPos[0], yPos);
-    _display->println(deps[i].id);
+    _display->println(deps[i-1].id);
     _display->setCursor(xPos[1], yPos);
-    _display->println(deps[i].direction);
+    _display->println(deps[i-1].direction);
     _display->setCursor(xPos[2], yPos);
-    _display->println(deps[i].arrival);
+    _display->println(deps[i-1].arrival);
   } 
   
 }
 
-String temp1[] = {"14", "Morby c.", "nu"};
-String temp2[] = {"14", "Fruangen", "2 min"};
-String temp3[] = {"14", "Fruangen", "20 min"};
-String temp4[] = {"14", "Fruangen", "20 min"};
-
-void Display::drawDeps2(String deps, int count) {
+void Display::drawText(String text) {
   _display->fillScreen(_black);
   _display->setFont(&TomThumb);
   _display->setTextSize(1);
   _display->setTextWrap(false);
   _display->setTextColor(_white);
-
-  for (int i = 0; i < count; i++) {
-    for (int j = 0; j < count; j++) {
-      _display->setCursor(xPos[j], i * 7 + 8);
-      if (i == 0)
-      {
-        _display->println(temp1[j]);
-      }
-      if (i == 1)
-      {
-        _display->println(temp2[j]);
-      }
-      if (i == 2)
-      {
-        _display->println(temp3[j]);
-      }
-      if (i == 3)
-      {
-        _display->println(temp4[j]);
-      }
-    } 
-  } 
-  
+  _display->setCursor(1, 8);
+  _display->println(text);
 }
 
   

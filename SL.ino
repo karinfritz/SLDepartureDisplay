@@ -6,9 +6,24 @@
 #include "caCert.h"
 #include "departures.h"
 #include "secrets.h"
+#include "timer.h"
+#include "weather.h"
+
+const char*  serverName = "transport.integration.sl.se"; // SL:s API (HTTPS)
+
+String latCoord = "59.300";
+String longCoord = "18.003";
+
+String weatherServerName = "https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/" + longCoord + "/lat/" + latCoord + "/data.json";
 
 String siteName = "Telefonplan";
 String siteID = "";
+
+const unsigned long API_INTERVAL = 5UL * 60UL * 1000UL; // 5 minuter
+unsigned long lastApiCall = -API_INTERVAL;
+
+unsigned long lastUpdate = 0;
+const unsigned long UPDATE_INTERVAL = 45UL * 1000UL; // 45 sekunder
 
 int numDeps = 4;
 
@@ -24,12 +39,40 @@ Departure depObjList[]= {
     dep4
 };
 
-// SL:s API (HTTPS)
 Display display = Display();
+Weather weather = Weather();
 
-const char*  serverName = "transport.integration.sl.se";
 const word bufferSize = 65535;
 char response[bufferSize];
+
+void getWeather() {
+  HTTPClient http;
+  http.begin(weatherServerName.c_str());
+  if (http.GET() != 200){
+    Serial.println("Failed to get weather info.");
+  };
+
+  DynamicJsonDocument doc(40 * 1024);
+  deserializeJson(doc, http.getString());
+  http.end();
+
+  JsonArray params = doc["timeSeries"][0]["parameters"];
+
+  for (JsonObject p : params) {
+    const char* name = p["name"];
+    float v = p["values"][0];
+    if (String(name) == "t") {
+        int vInt = round(v);
+        weather.setTemp(vInt);
+    }
+    if (String(name) == "ws") {
+        weather.setWind(v);
+    }
+    if (String(name) == "Wsymb2") {
+        weather.setIcon(v);
+    }
+  }
+}
 
 String getSiteID(String wantedName) {
     Serial.println("Fetching Site ID for " + siteName);
@@ -64,6 +107,7 @@ String getDep(String siteId){
             const char* direction_temp = dep["direction"] | "";
             String direction = String(direction_temp);
             const char* arrival = dep["display"] | "";
+            const char* scheduled = dep["scheduled"] | "";
             direction.replace("ö", "o");
             direction.replace("ä", "a");
             direction.replace("å", "a");
@@ -73,6 +117,7 @@ String getDep(String siteId){
                 depObjList[i].setId(idStr);
                 depObjList[i].setDirection(direction);
                 depObjList[i].setArrival(arrival);
+                depObjList[i].setScheduled(scheduled);
             } 
         }
     }
@@ -191,28 +236,29 @@ String httpGETRequest(String url, bool getSiteIdFunc, bool getDepFunc) {
     }
     return departures;
 }
-  
-int cursor = 0;
-int requestDelay = 18;
-int i = requestDelay - 1;
 
 void setup() {
   Serial.begin(115200);
   Serial.println("setup");
   delay(1000);
 
-  //display.init();
   display.start();
- 
   delay(1000);
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+  display.drawText("Connecting to WiFi");
 
   while (WiFi.status() != WL_CONNECTED) {
       delay(500);
       Serial.print(".");
   }
   Serial.println("\nWiFi OK!");
+  display.drawText("Setup local time...");
+  setupTime();
+  display.drawText("Loading weather...");
+  getWeather();
+  display.drawText("Fetching deps...");
 
   // Hämta plats-id
   //siteID = getSiteID(siteName);
@@ -220,7 +266,38 @@ void setup() {
 }
 
 void loop() {
-  getDep(siteID);
-  display.drawDeps(depObjList, numDeps);
-  delay(80000);
+  unsigned long now = millis();
+  String nowStr = getCurrTime();
+  String tempStr = weather.getTempStr();
+
+  if (now - lastApiCall >= API_INTERVAL) {
+    getWeather();
+    lastApiCall = now;
+    lastUpdate = now;
+    getDep(siteID);
+    
+    display.drawTimeAndWeather(nowStr, tempStr, weather.icon);
+    display.drawDeps(depObjList, numDeps - 1);
+  }
+
+  else if (now - lastUpdate >= UPDATE_INTERVAL) {
+    
+    lastUpdate = now;
+    if (depObjList[0].remaining == 0) {
+        for (int i = 0; i < numDeps - 1; i++) {
+            depObjList[i] = depObjList[i + 1];
+        }
+        
+    }
+    for (int i = 0; i < numDeps; i++) {
+        int r = getRemainingMinutes(depObjList[i].scheduled);
+        depObjList[i].setRemaining(r);
+        depObjList[i].updateArrival();
+    }
+    
+    display.drawTimeAndWeather(nowStr, tempStr, weather.icon);
+    display.drawDeps(depObjList, numDeps - 1);
+  }
+  
+  delay(1000);
 }

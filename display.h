@@ -3,7 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Fonts/TomThumb.h>
 #include "departures.h"
-
+#include "icons.h"
 
 class Display {
 private:
@@ -15,6 +15,9 @@ private:
   int _blue;
   int _gray;
   int _yeish;
+  int _darkyellow;
+  void prepare();
+  void drawIcon5(int x, int y, const uint8_t* icon, uint16_t color, int i);
 
 public:
   // functions
@@ -25,4 +28,6 @@ public:
   void showNext(String depStr, String depStr2, int cursor);
   void drawDeps(Departure deps[], int count);
   void drawDeps2(String deps, int count);
+  void drawText(String text);
+  void drawTimeAndWeather(String timeStr, String tempStr, int i);
 };

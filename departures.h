@@ -9,11 +9,16 @@ public:
   String id = "";
   String arrival = "";
   String direction = "";
+  String scheduled = "";
+  int remaining = 0; // remaining minutes to departure
 
   // functions
   void setDirection(String s);
   void setArrival(String s);
   void setId(String s);
+  void setScheduled(String s);
+  void setRemaining(int i);
+  void updateArrival();
 
   
 private:

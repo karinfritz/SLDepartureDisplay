@@ -15,4 +15,22 @@ void Departure::setDirection(String dir) {
   direction = dir;
 }
 
+void Departure::setScheduled(String s) {
+  scheduled = s;
+}
+
+void Departure::setRemaining(int i) {
+  remaining = i;
+}
+
+void Departure::updateArrival() {
+  String newArrival = "";
+  if (remaining < 1) {
+    arrival = "Nu";
+  }
+  else {
+    arrival = String(remaining) + " min";
+  }
+}
+
 
